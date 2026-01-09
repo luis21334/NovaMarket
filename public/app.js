@@ -237,3 +237,55 @@ async function borrarProducto(id) {
     await fetch(`/api/admin/productos/${id}`, { method: 'DELETE' });
     cargarProductos();
 }
+// ... (El resto del código de arriba se queda igual)
+
+// --- FUNCIÓN LOGIN MEJORADA ---
+async function login() {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-pass').value;
+    const errorMsg = document.getElementById('msg-error'); // Seleccionamos el parrafo de error
+
+    // Reiniciar mensaje de error
+    errorMsg.style.display = 'none';
+
+    if(!email || !password) {
+        errorMsg.innerText = "⚠️ Por favor llena ambos campos";
+        errorMsg.style.display = 'block';
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            // SI ES CORRECTO
+            esAdmin = true;
+            document.getElementById('admin-bar').style.display = 'block';
+            cerrarModal('modal-login');
+            renderizarProductos(); 
+            // Limpiar campos
+            document.getElementById('login-email').value = '';
+            document.getElementById('login-pass').value = '';
+        } else {
+            // SI ES INCORRECTO (Muestra el mensaje rojo)
+            errorMsg.innerText = "⚠️ Usuario o contraseña incorrectos";
+            errorMsg.style.display = 'block';
+            
+            // Efecto visual de "temblor" si quieres (opcional)
+            const inputPass = document.getElementById('login-pass');
+            inputPass.style.borderColor = 'red';
+            setTimeout(() => inputPass.style.borderColor = '#eee', 2000);
+        }
+    } catch (err) {
+        errorMsg.innerText = "❌ Error de conexión con el servidor";
+        errorMsg.style.display = 'block';
+    }
+}
+
+// ... (El resto del código de CRUD y carrito sigue igual)
