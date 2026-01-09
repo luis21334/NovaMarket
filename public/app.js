@@ -130,6 +130,7 @@ function agregarCarrito(id) {
     else carrito.push({...p, cantidad:1});
     updateCartUI();
 }
+
 function updateCartUI() {
     const count = carrito.reduce((a,b)=>a+b.cantidad,0);
     const total = carrito.reduce((a,b)=>a+(b.precio*b.cantidad),0);
@@ -143,6 +144,10 @@ function updateCartUI() {
             <span>${i.cantidad}x ${i.nombre}</span><span>$${(i.precio*i.cantidad).toFixed(2)} 
             <button onclick="carrito.splice(${idx},1);updateCartUI()" style="color:red; background:none; padding:0;">✕</button></span></div>`;
     });
+}
+
+function abrirCarrito() {
+    document.getElementById('modal-carrito').style.display='flex';
 }
 
 function iniciarCheckout() {
@@ -169,7 +174,7 @@ function procesarPago() {
             body: JSON.stringify({
                 carrito, 
                 cliente: usuarioActual.nombre, 
-                email: usuarioActual.email, // Enviamos el email para rastrear
+                email: usuarioActual.email, 
                 metodoPago: metodo
             })
         });
@@ -196,65 +201,19 @@ function verTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(d=>d.style.display='none');
     document.querySelectorAll('.tab-link').forEach(b=>b.classList.remove('active'));
     document.getElementById(`tab-${tabName}`).style.display='block';
-    event.target.classList.add('active');
+    // event es global en navegadores modernos, pero por seguridad:
+    if(event) event.target.classList.add('active');
+    
+    if(tabName === 'cortes') llenarHistorialCortes();
     if(tabName === 'clientes') cargarClientesAdmin();
-}
-
-async function cargarClientesAdmin() {
-    const res = await fetch('/api/admin/clientes');
-    const lista = await res.json();
-    const tbody = document.getElementById('lista-clientes-admin');
-    tbody.innerHTML = '';
-    lista.forEach(c => {
-        tbody.innerHTML += `
-            <tr>
-                <td>${c.nombre}</td>
-                <td>${c.email}</td>
-                <td>
-                    <button class="btn-info" style="padding:5px;" onclick="verHistorial('${c.email}')">📜 Historial</button>
-                    <button class="btn-danger" style="padding:5px;" onclick="bajaCliente(${c.id})">🗑️ Baja</button>
-                </td>
-            </tr>
-        `;
-    });
-}
-
-// NUEVO: Ver Historial de Cliente
-async function verHistorial(email) {
-    document.getElementById('historial-cliente-email').innerText = email;
-    const res = await fetch(`/api/admin/historial/${email}`);
-    const pedidos = await res.json();
-    
-    const cont = document.getElementById('lista-historial');
-    cont.innerHTML = '';
-    
-    if(pedidos.length === 0) {
-        cont.innerHTML = '<p style="padding:10px;">Sin compras registradas.</p>';
-    } else {
-        pedidos.forEach(p => {
-            cont.innerHTML += `
-                <div style="padding:10px; border-bottom:1px solid #eee;">
-                    <strong>Pedido #${p.id}</strong> - ${new Date(p.fecha).toLocaleDateString()}<br>
-                    Total: $${p.total}
-                </div>`;
-        });
-    }
-    document.getElementById('modal-historial').style.display = 'flex';
-}
-
-async function bajaCliente(id) {
-    if(confirm("¿Eliminar cliente?")) {
-        await fetch(`/api/admin/clientes/${id}`, {method:'DELETE'});
-        cargarClientesAdmin();
-    }
 }
 
 async function actualizarStatsAdmin() {
     const res = await fetch('/api/admin/stats');
     const data = await res.json();
-    document.getElementById('admin-ventas-hoy').innerText = `$${parseFloat(data.corteHoy).toFixed(2)}`;
-    document.getElementById('dash-corte').innerText = `$${parseFloat(data.corteHoy).toFixed(2)}`;
-    document.getElementById('dash-ingresos').innerText = `$${parseFloat(data.ingresos).toFixed(2)}`;
+    document.getElementById('admin-ventas-hoy').innerText = `$${parseFloat(data.corteActual).toFixed(2)}`;
+    document.getElementById('dash-corte').innerText = `$${parseFloat(data.corteActual).toFixed(2)}`;
+    document.getElementById('dash-ingresos').innerText = `$${parseFloat(data.ingresosTotales).toFixed(2)}`;
     document.getElementById('dash-stock').innerText = data.stockBajo;
     
     const ctx = document.getElementById('ventasChart').getContext('2d');
@@ -264,13 +223,52 @@ async function actualizarStatsAdmin() {
     });
 }
 
-function abrirDashboard() { actualizarStatsAdmin(); verTab('resumen'); document.getElementById('modal-dashboard').style.display='flex'; }
-function hacerCorteCaja() {
-    const total = document.getElementById('dash-corte').innerText;
-    const fecha = new Date().toLocaleDateString();
-    const win = window.open('','','width=400,height=400');
-    win.document.write(`<h2 style="text-align:center">✂️ CORTE</h2><p>Fecha: ${fecha}</p><p>Resp: ${usuarioActual.nombre}</p><hr><h1 style="text-align:center">${total}</h1><hr>`); win.print();
+async function hacerCorteCaja() {
+    const totalTxt = document.getElementById('dash-corte').innerText.replace('$','');
+    const total = parseFloat(totalTxt);
+    if(total === 0) return alert("Turno en ceros.");
+    if(!confirm(`¿Cerrar turno por $${total}?`)) return;
+
+    const res = await fetch('/api/admin/corte', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({usuario: usuarioActual.nombre, total})
+    });
+    const data = await res.json();
+    if(data.success) {
+        alert("Corte realizado.");
+        actualizarStatsAdmin();
+    }
 }
+
+async function llenarHistorialCortes() {
+    const res = await fetch('/api/admin/historial-cortes');
+    const lista = await res.json();
+    const tbody = document.getElementById('lista-cortes-history');
+    tbody.innerHTML = lista.map(c => `<tr><td>${new Date(c.fecha).toLocaleString()}</td><td>${c.usuario}</td><td style="color:green;font-weight:bold">$${c.total}</td></tr>`).join('');
+}
+
+async function cargarClientesAdmin() {
+    const res = await fetch('/api/admin/clientes');
+    const lista = await res.json();
+    const tbody = document.getElementById('lista-clientes-admin');
+    tbody.innerHTML = lista.map(c => `
+        <tr><td>${c.nombre}</td><td>${c.email}</td>
+        <td><button class="btn-info" onclick="verHistorial('${c.email}')">Historial</button> 
+        <button class="btn-danger" onclick="bajaCliente(${c.id})">Baja</button></td></tr>
+    `).join('');
+}
+
+async function verHistorial(email) {
+    document.getElementById('hist-email').innerText = email;
+    const res = await fetch(`/api/admin/historial/${email}`);
+    const pedidos = await res.json();
+    const cont = document.getElementById('hist-lista');
+    cont.innerHTML = pedidos.length ? pedidos.map(p => `<div style="padding:10px; border-bottom:1px solid #eee;"><strong>#${p.id}</strong> - ${new Date(p.fecha).toLocaleDateString()} - $${p.total}</div>`).join('') : '<p style="padding:10px">Sin compras.</p>';
+    document.getElementById('modal-historial').style.display='flex';
+}
+
+async function bajaCliente(id) { if(confirm("¿Eliminar?")) { await fetch(`/api/admin/clientes/${id}`, {method:'DELETE'}); cargarClientesAdmin(); } }
+function abrirDashboard() { actualizarStatsAdmin(); verTab('resumen'); document.getElementById('modal-dashboard').style.display='flex'; }
 
 // Helpers
 function toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode')); }

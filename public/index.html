@@ -19,9 +19,11 @@
                 Hola, <span id="user-name" style="font-weight:bold;">Usuario</span><br>
                 <small id="user-role" style="opacity:0.8">Cliente</small>
             </div>
+            
             <button class="btn-accent" onclick="abrirCarrito()">
                 🛍️ <span id="badge-count" class="badge">0</span>
             </button>
+            
             <button id="btn-login-main" class="btn-primary" onclick="toggleLogin()">Ingresar</button>
             <button id="btn-logout-main" class="btn-danger" style="display:none;" onclick="logout()">Salir</button>
         </div>
@@ -30,10 +32,10 @@
     <div id="admin-bar" class="admin-bar">
         <div style="display:flex; align-items:center; gap:10px;">
             <span style="font-weight:bold;">🔐 GERENCIA</span>
-            <span class="stat-badge">Ventas Hoy: <span id="admin-ventas-hoy">$0.00</span></span>
+            <span class="stat-badge">Turno Actual: <span id="admin-ventas-hoy" style="color:#00ff88; font-weight:bold;">$0.00</span></span>
         </div>
         <div>
-            <button class="btn-info" onclick="abrirDashboard()">📊 Panel Control</button>
+            <button class="btn-info" onclick="abrirDashboard()">📊 Panel & Cortes</button>
             <button class="btn-success" onclick="abrirModalProducto()">+ Producto</button>
         </div>
     </div>
@@ -90,18 +92,27 @@
         <div class="modal-content" style="max-width: 800px;">
             <div class="tabs">
                 <button class="tab-link active" onclick="verTab('resumen')">📊 Resumen</button>
+                <button class="tab-link" onclick="verTab('cortes')">✂️ Cortes</button>
                 <button class="tab-link" onclick="verTab('clientes')">👥 Clientes</button>
-                <button class="tab-link" onclick="verTab('config')">⚙️ Config</button>
             </div>
 
             <div id="tab-resumen" class="tab-content active">
                 <div class="stats-grid">
-                    <div class="stat-card"><h4>Ventas Hoy</h4><p class="stat-num c-green" id="dash-corte">$0</p></div>
-                    <div class="stat-card"><h4>Total Histórico</h4><p class="stat-num c-blue" id="dash-ingresos">$0</p></div>
+                    <div class="stat-card"><h4>Venta Turno Actual</h4><p class="stat-num c-green" id="dash-corte">$0</p></div>
+                    <div class="stat-card"><h4>Ingreso Histórico</h4><p class="stat-num c-blue" id="dash-ingresos">$0</p></div>
                     <div class="stat-card"><h4>Stock Crítico</h4><p class="stat-num c-red" id="dash-stock">0</p></div>
                 </div>
                 <div class="chart-wrapper"><canvas id="ventasChart"></canvas></div>
-                <button class="btn-primary full-width" onclick="hacerCorteCaja()">✂️ CORTE DE CAJA</button>
+                <button class="btn-primary full-width" onclick="hacerCorteCaja()">✂️ REALIZAR CORTE DE CAJA (RESET)</button>
+            </div>
+
+            <div id="tab-cortes" class="tab-content">
+                <h2>Historial de Cortes</h2>
+                <button class="btn-info full-width" onclick="llenarHistorialCortes()">🔄 Actualizar Tabla</button>
+                <table class="data-table">
+                    <thead><tr><th>Fecha</th><th>Resp.</th><th>Total</th></tr></thead>
+                    <tbody id="lista-cortes-history"></tbody>
+                </table>
             </div>
 
             <div id="tab-clientes" class="tab-content">
@@ -112,21 +123,14 @@
                 </table>
             </div>
 
-            <div id="tab-config" class="tab-content">
-                <h3>Seguridad</h3>
-                <input type="password" id="new-admin-pass" placeholder="Nueva clave de Gerente">
-                <button class="btn-success full-width" onclick="cambiarPasswordAdmin()">Actualizar Contraseña</button>
-            </div>
             <button class="btn-secondary full-width" onclick="cerrarModal('modal-dashboard')">Cerrar</button>
         </div>
     </div>
 
     <div id="modal-historial" class="modal">
         <div class="modal-content">
-            <h3>Historial de Compras</h3>
-            <p>Cliente: <span id="historial-cliente-email" style="font-weight:bold;"></span></p>
-            <div id="lista-historial" style="max-height:300px; overflow-y:auto; margin-top:10px; border:1px solid #eee;">
-                </div>
+            <h3>Compras de: <span id="hist-email"></span></h3>
+            <div id="hist-lista" style="max-height:300px; overflow-y:auto; border:1px solid #ddd; margin-top:10px;"></div>
             <button class="btn-secondary full-width" onclick="cerrarModal('modal-historial')">Cerrar</button>
         </div>
     </div>
@@ -139,20 +143,16 @@
                 <input type="email" id="login-email" placeholder="Email">
                 <input type="password" id="login-pass" placeholder="Contraseña">
                 <button class="btn-primary full-width" onclick="login()">Entrar</button>
-                <p style="text-align:center; font-size:0.9rem; margin-top:10px;">
-                    ¿No tienes cuenta? <a href="#" onclick="toggleRegistro()">Regístrate aquí</a>
-                </p>
+                <p style="text-align:center; margin-top:10px;"><a href="#" onclick="toggleRegistro()">Crear cuenta</a></p>
                 <button class="btn-secondary full-width" onclick="cerrarModal('modal-login')">Cancelar</button>
             </div>
             <div id="form-registro" style="display:none;">
-                <h3>Crear Cuenta</h3>
-                <input type="text" id="reg-nombre" placeholder="Nombre completo">
-                <input type="email" id="reg-email" placeholder="Correo electrónico">
+                <h3>Registro</h3>
+                <input type="text" id="reg-nombre" placeholder="Nombre">
+                <input type="email" id="reg-email" placeholder="Email">
                 <input type="password" id="reg-pass" placeholder="Contraseña">
                 <button class="btn-success full-width" onclick="registrarCliente()">Registrarme</button>
-                <p style="text-align:center; font-size:0.9rem; margin-top:10px;">
-                    <a href="#" onclick="toggleRegistro()">Volver al Login</a>
-                </p>
+                <p style="text-align:center; margin-top:10px;"><a href="#" onclick="toggleRegistro()">Volver</a></p>
             </div>
         </div>
     </div>
