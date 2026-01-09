@@ -279,12 +279,58 @@ function filtrar(cat, btn) { document.querySelectorAll('.cat-filters button').fo
 function filtrarProductos() { const txt = document.getElementById('buscador').value.toLowerCase(); renderizarProductos(productos.filter(p=>p.nombre.toLowerCase().includes(txt))); }
 
 // CRUD Prod
-let editId=null;
-function abrirModalProducto(){editId=null; document.getElementById('modal-producto').style.display='flex';}
-function editarProducto(id){const p=productos.find(x=>x.id==id); editId=id; document.getElementById('prod-nombre').value=p.nombre; document.getElementById('prod-precio').value=p.precio; document.getElementById('prod-stock').value=p.stock; document.getElementById('prod-cat').value=p.categoria; document.getElementById('prod-img').value=p.imagen_url; document.getElementById('modal-producto').style.display='flex';}
-async function guardarProducto(){
-    const body={nombre:document.getElementById('prod-nombre').value, precio:document.getElementById('prod-precio').value, stock:document.getElementById('prod-stock').value, categoria:document.getElementById('prod-cat').value, imagen_url:document.getElementById('prod-img').value};
-    const url=editId?`/api/admin/productos/${editId}`:'/api/admin/productos'; const method=editId?'PUT':'POST';
-    await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); cerrarModal('modal-producto'); cargarProductos();
+let editId = null;
+
+function abrirModalProducto() {
+    editId = null;
+    
+    if(document.getElementById('titulo-modal-prod')) {
+        document.getElementById('titulo-modal-prod').innerText = 'Nuevo Producto';
+    }
+
+    
+    document.getElementById('prod-nombre').value = '';
+    document.getElementById('prod-precio').value = '';
+    document.getElementById('prod-stock').value = '';
+    document.getElementById('prod-cat').value = '';
+    document.getElementById('prod-img').value = '';
+
+    document.getElementById('modal-producto').style.display = 'flex';
 }
-async function borrarProducto(id){if(confirm('¿Borrar?')){await fetch(`/api/admin/productos/${id}`,{method:'DELETE'});cargarProductos();}}
+
+function editarProducto(id) {
+    const p = productos.find(x => x.id == id);
+    editId = id;
+    if(document.getElementById('titulo-modal-prod')) {
+        document.getElementById('titulo-modal-prod').innerText = 'Editar Producto';
+    }
+    document.getElementById('prod-nombre').value = p.nombre;
+    document.getElementById('prod-precio').value = p.precio;
+    document.getElementById('prod-stock').value = p.stock;
+    document.getElementById('prod-cat').value = p.categoria;
+    document.getElementById('prod-img').value = p.imagen_url;
+    document.getElementById('modal-producto').style.display = 'flex';
+}
+
+async function guardarProducto() {
+    const body = {
+        nombre: document.getElementById('prod-nombre').value,
+        precio: document.getElementById('prod-precio').value,
+        stock: document.getElementById('prod-stock').value,
+        categoria: document.getElementById('prod-cat').value,
+        imagen_url: document.getElementById('prod-img').value
+    };
+    const url = editId ? `/api/admin/productos/${editId}` : '/api/admin/productos';
+    const method = editId ? 'PUT' : 'POST';
+    
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    cerrarModal('modal-producto');
+    cargarProductos();
+}
+
+async function borrarProducto(id) {
+    if (confirm('¿Borrar?')) {
+        await fetch(`/api/admin/productos/${id}`, { method: 'DELETE' });
+        cargarProductos();
+    }
+}
