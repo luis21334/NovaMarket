@@ -6,9 +6,9 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// --- RUTAS PÚBLICAS ---
 
-// Obtener productos
+
+
 app.get('/api/productos', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM productos ORDER BY id ASC');
@@ -16,7 +16,7 @@ app.get('/api/productos', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Login
+
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -30,7 +30,7 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Registro
+
 app.post('/api/registro', async (req, res) => {
     const { nombre, email, password } = req.body;
     try {
@@ -41,7 +41,7 @@ app.post('/api/registro', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Comprar
+
 app.post('/api/comprar', async (req, res) => {
     const { carrito, cliente, email, metodoPago } = req.body;
     const client = await pool.connect();
@@ -50,7 +50,7 @@ app.post('/api/comprar', async (req, res) => {
         let total = 0;
         for (const item of carrito) total += item.precio * item.cantidad;
 
-        // Guardamos email en el nombre para rastreo
+        
         const clienteID = email ? `${cliente} (${email})` : `${cliente} (Anónimo)`;
 
         const pedidoRes = await client.query(
@@ -75,22 +75,20 @@ app.post('/api/comprar', async (req, res) => {
     }
 });
 
-// --- RUTAS GERENTE (CORTES Y ESTADÍSTICAS) ---
 
-// Estadísticas Inteligentes (Calcula ventas DESDE el último corte)
 app.get('/api/admin/stats', async (req, res) => {
     try {
-        // 1. Buscar fecha del último corte
+        
         const ultimoCorte = await pool.query('SELECT fecha FROM cortes_caja ORDER BY id DESC LIMIT 1');
         const fechaInicio = ultimoCorte.rows.length > 0 ? ultimoCorte.rows[0].fecha : '1970-01-01';
 
-        // 2. Sumar ventas solo desde esa fecha
+        
         const ventasTurno = await pool.query(
             'SELECT SUM(total) as total, COUNT(*) as cantidad FROM pedidos WHERE fecha > $1',
             [fechaInicio]
         );
 
-        // 3. Totales Históricos
+        
         const ingresosTotales = await pool.query('SELECT SUM(total) as total FROM pedidos');
         const stockBajo = await pool.query('SELECT COUNT(*) as cant FROM productos WHERE stock < 5');
         const topProd = await pool.query(`
@@ -100,7 +98,7 @@ app.get('/api/admin/stats', async (req, res) => {
         `);
 
         res.json({
-            corteActual: ventasTurno.rows[0].total || 0, // ESTO SE REINICIA
+            corteActual: ventasTurno.rows[0].total || 0, 
             ventasTurno: ventasTurno.rows[0].cantidad || 0,
             ingresosTotales: ingresosTotales.rows[0].total || 0,
             stockBajo: stockBajo.rows[0].cant || 0,
@@ -109,7 +107,7 @@ app.get('/api/admin/stats', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Realizar Corte
+
 app.post('/api/admin/corte', async (req, res) => {
     const { usuario, total } = req.body;
     try {
@@ -118,7 +116,7 @@ app.post('/api/admin/corte', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Historial de Cortes
+
 app.get('/api/admin/historial-cortes', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM cortes_caja ORDER BY fecha DESC LIMIT 10');
@@ -126,7 +124,7 @@ app.get('/api/admin/historial-cortes', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Gestión Clientes
+
 app.get('/api/admin/clientes', async (req, res) => {
     try {
         const result = await pool.query("SELECT id, nombre, email FROM usuarios WHERE rol = 'cliente'");
@@ -145,7 +143,7 @@ app.delete('/api/admin/clientes/:id', async (req, res) => {
     try { await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// CRUD Productos
+
 app.post('/api/admin/productos', async (req, res) => {
     const { nombre, precio, stock, imagen_url, categoria } = req.body;
     try { await pool.query('INSERT INTO productos (nombre, precio, stock, imagen_url, categoria) VALUES ($1, $2, $3, $4, $5)', [nombre, precio, stock, imagen_url, categoria]); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); }

@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(userStored) setUsuario(JSON.parse(userStored));
 });
 
-// --- AUTENTICACIÓN ---
+
 function setUsuario(user) {
     usuarioActual = user;
     localStorage.setItem('novaUser', JSON.stringify(user));
@@ -80,7 +80,7 @@ async function registrarCliente() {
     }
 }
 
-// --- PRODUCTOS ---
+
 async function cargarProductos() {
     try {
         const res = await fetch('/api/productos');
@@ -122,7 +122,7 @@ function renderizarProductos(lista) {
     });
 }
 
-// --- CARRITO Y PAGO ---
+
 function agregarCarrito(id) {
     const p = productos.find(x=>x.id==id);
     const item = carrito.find(x=>x.id==id);
@@ -196,12 +196,11 @@ function imprimirTicket(id, total, metodo) {
     win.document.write(`<pre>${t}</pre>`); win.print();
 }
 
-// --- GESTIÓN DE GERENTE ---
+
 function verTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(d=>d.style.display='none');
     document.querySelectorAll('.tab-link').forEach(b=>b.classList.remove('active'));
     document.getElementById(`tab-${tabName}`).style.display='block';
-    // event es global en navegadores modernos, pero por seguridad:
     if(event) event.target.classList.add('active');
     
     if(tabName === 'cortes') llenarHistorialCortes();
