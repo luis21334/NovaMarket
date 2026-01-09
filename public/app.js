@@ -1,20 +1,83 @@
 let carrito = [];
 let productos = [];
-let esAdmin = false;
-let chartInstance = null; // Instancia de la gráfica
+let usuarioActual = null;
+let chartInstance = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarProductos();
     checkDarkMode();
+    const userStored = localStorage.getItem('novaUser');
+    if(userStored) setUsuario(JSON.parse(userStored));
 });
 
-// --- MODO OSCURO ---
-function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode'));
+// --- AUTENTICACIÓN ---
+function setUsuario(user) {
+    usuarioActual = user;
+    localStorage.setItem('novaUser', JSON.stringify(user));
+    
+    document.getElementById('btn-login-main').style.display = 'none';
+    document.getElementById('btn-logout-main').style.display = 'block';
+    document.getElementById('user-info').style.display = 'block';
+    document.getElementById('user-name').innerText = user.nombre;
+    document.getElementById('user-role').innerText = user.rol === 'admin' ? 'Gerente' : 'Cliente';
+
+    if (user.rol === 'admin') {
+        document.getElementById('admin-bar').style.display = 'flex';
+        actualizarStatsAdmin();
+    }
+    renderizarProductos(productos);
 }
-function checkDarkMode() {
-    if(localStorage.getItem('dark-mode') === 'true') document.body.classList.add('dark-mode');
+
+function logout() {
+    usuarioActual = null;
+    localStorage.removeItem('novaUser');
+    location.reload();
+}
+
+async function login() {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-pass').value;
+    const res = await fetch('/api/login', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if(data.success) {
+        setUsuario(data.user);
+        cerrarModal('modal-login');
+    } else {
+        document.getElementById('msg-error').style.display = 'block';
+    }
+}
+
+function toggleRegistro() {
+    const loginForm = document.getElementById('form-login');
+    const regForm = document.getElementById('form-registro');
+    if (loginForm.style.display === 'none') {
+        loginForm.style.display = 'block'; regForm.style.display = 'none';
+    } else {
+        loginForm.style.display = 'none'; regForm.style.display = 'block';
+    }
+}
+
+async function registrarCliente() {
+    const nombre = document.getElementById('reg-nombre').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-pass').value;
+
+    if(!nombre || !email || !password) return alert("Llena todos los campos");
+
+    const res = await fetch('/api/registro', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({nombre, email, password})
+    });
+    const data = await res.json();
+    if(data.success) {
+        alert("Registro exitoso. Inicia sesión.");
+        toggleRegistro();
+    } else {
+        alert(data.message || "Error");
+    }
 }
 
 // --- PRODUCTOS ---
@@ -22,315 +85,209 @@ async function cargarProductos() {
     try {
         const res = await fetch('/api/productos');
         productos = await res.json();
-        generarBotonesCategorias();
+        generarCategorias();
         renderizarProductos(productos);
-    } catch (e) { console.error("Error:", e); }
+    } catch(e) { console.error(e); }
 }
 
 function renderizarProductos(lista) {
     const grid = document.getElementById('grid-productos');
     grid.innerHTML = '';
-    
-    if(lista.length === 0) {
-        grid.innerHTML = '<p style="grid-column:1/-1; text-align:center">No se encontraron productos.</p>';
-        return;
-    }
+    const esAdmin = usuarioActual && usuarioActual.rol === 'admin';
 
     lista.forEach(p => {
-        // Controles de Admin (Editar/Borrar)
         const adminHtml = esAdmin ? `
-            <div style="display:flex; gap:5px; margin-bottom:10px;">
-                <button onclick="editarProducto(${p.id})" class="btn-info" style="font-size:0.8rem; padding:5px 10px;">✏️ Editar</button>
-                <button onclick="borrarProducto(${p.id})" class="btn-danger" style="font-size:0.8rem; padding:5px 10px;">🗑️ Borrar</button>
+            <div style="margin-bottom:10px; display:flex; gap:5px;">
+                <button onclick="editarProducto(${p.id})" class="btn-info" style="font-size:0.8rem; padding:5px;">✏️</button>
+                <button onclick="borrarProducto(${p.id})" class="btn-danger" style="font-size:0.8rem; padding:5px;">🗑️</button>
             </div>` : '';
-
-        // Botón de Compra
+        
         const btnCompra = p.stock > 0 
-            ? `<button class="btn-accent full-width" onclick="agregarCarrito(${p.id})">Agregar al Carrito</button>`
-            : `<button class="btn-secondary full-width" disabled style="opacity:0.6">Agotado</button>`;
+            ? `<button class="btn-accent full-width" onclick="agregarCarrito(${p.id})">Agregar</button>`
+            : `<button class="btn-secondary full-width" disabled>Agotado</button>`;
 
         grid.innerHTML += `
             <div class="card">
-                <img src="${p.imagen_url}" onerror="this.src='https://via.placeholder.com/300?text=Sin+Imagen'">
+                <img src="${p.imagen_url}" onerror="this.src='https://via.placeholder.com/300'">
                 <div class="card-body">
                     <div>
-                        <span class="card-cat">${p.categoria || 'Varios'}</span>
+                        <small style="opacity:0.7">${p.categoria||'Varios'}</small>
                         <h3>${p.nombre}</h3>
                         <div class="card-price">$${p.precio}</div>
-                        <small style="color:${p.stock<5?'#e74c3c':'#27ae60'}">Stock: ${p.stock}</small>
+                        <small style="color:${p.stock<5?'red':'green'}">Stock: ${p.stock}</small>
                     </div>
-                    <div style="margin-top:10px;">
-                        ${adminHtml}
-                        ${btnCompra}
-                    </div>
+                    <div style="margin-top:10px;">${adminHtml}${btnCompra}</div>
                 </div>
-            </div>
-        `;
+            </div>`;
     });
 }
 
-// --- FILTROS ---
-function generarBotonesCategorias() {
-    const cont = document.getElementById('filtros-categorias');
-    const cats = ['Todas', ...new Set(productos.map(p => p.categoria || 'Otros'))];
-    cont.innerHTML = '';
-    cats.forEach(c => {
-        cont.innerHTML += `<button onclick="filtrarCat('${c}', this)" class="${c==='Todas'?'active':''}">${c}</button>`;
-    });
-}
-
-function filtrarCat(cat, btn) {
-    document.querySelectorAll('.cat-filters button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const filtrados = cat === 'Todas' ? productos : productos.filter(p => (p.categoria||'Otros') === cat);
-    renderizarProductos(filtrados);
-}
-
-function filtrarProductos() {
-    const txt = document.getElementById('buscador').value.toLowerCase();
-    const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(txt));
-    renderizarProductos(filtrados);
-}
-
-// --- CARRITO ---
+// --- CARRITO Y PAGO ---
 function agregarCarrito(id) {
-    const prod = productos.find(p => p.id === id);
-    const item = carrito.find(i => i.id === id);
-
-    if (item) {
-        if (item.cantidad >= prod.stock) return alert("¡No puedes agregar más de lo que hay en stock!");
-        item.cantidad++;
-    } else {
-        carrito.push({ ...prod, cantidad: 1 });
-    }
-    actualizarCarritoUI();
+    const p = productos.find(x=>x.id==id);
+    const item = carrito.find(x=>x.id==id);
+    if(item) { if(item.cantidad>=p.stock) return alert('Sin stock'); item.cantidad++; }
+    else carrito.push({...p, cantidad:1});
+    updateCartUI();
 }
-
-function actualizarCarritoUI() {
-    const count = carrito.reduce((acc, item) => acc + item.cantidad, 0);
-    const total = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
-
-    // Actualizar Badges y Textos
-    document.getElementById('badge-count').innerText = count;
-    document.getElementById('items-count').innerText = count;
-    document.getElementById('total-carrito').innerText = total.toFixed(2);
-    document.getElementById('checkout-total').innerText = total.toFixed(2);
-
-    // Renderizar Lista
-    const lista = document.getElementById('lista-carrito');
-    lista.innerHTML = '';
+function updateCartUI() {
+    const count = carrito.reduce((a,b)=>a+b.cantidad,0);
+    const total = carrito.reduce((a,b)=>a+(b.precio*b.cantidad),0);
+    document.getElementById('badge-count').innerText=count;
+    document.getElementById('total-carrito').innerText=total.toFixed(2);
     
-    if(carrito.length === 0) lista.innerHTML = '<p style="text-align:center">Carrito vacío.</p>';
-
-    carrito.forEach((item, idx) => {
-        lista.innerHTML += `
-            <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:8px 0;">
-                <div>
-                    <strong>${item.nombre}</strong><br>
-                    <small>${item.cantidad} x $${item.precio}</small>
-                </div>
-                <div style="text-align:right">
-                    <strong>$${(item.cantidad * item.precio).toFixed(2)}</strong><br>
-                    <button onclick="eliminarDelCarrito(${idx})" style="color:#e74c3c; background:none; padding:0; font-size:0.8rem;">Eliminar</button>
-                </div>
-            </div>
-        `;
+    const list = document.getElementById('lista-carrito');
+    list.innerHTML = carrito.length ? '' : '<p align="center">Vacío</p>';
+    carrito.forEach((i, idx)=> {
+        list.innerHTML+=`<div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:5px;">
+            <span>${i.cantidad}x ${i.nombre}</span><span>$${(i.precio*i.cantidad).toFixed(2)} 
+            <button onclick="carrito.splice(${idx},1);updateCartUI()" style="color:red; background:none; padding:0;">✕</button></span></div>`;
     });
 }
 
-function eliminarDelCarrito(idx) {
-    carrito.splice(idx, 1);
-    actualizarCarritoUI();
-}
-
-function abrirCarrito() {
-    document.getElementById('modal-carrito').style.display = 'flex';
-}
-
-// --- CHECKOUT (SIMULACIÓN DE PAGO) ---
 function iniciarCheckout() {
-    if(carrito.length === 0) return alert("El carrito está vacío");
-    document.getElementById('modal-carrito').style.display = 'none';
-    
-    // Resetear Estado del Modal Checkout
-    document.getElementById('checkout-form-view').style.display = 'block';
-    document.getElementById('checkout-loading').style.display = 'none';
-    document.getElementById('modal-checkout').style.display = 'flex';
+    if(!usuarioActual) return alert("Debes iniciar sesión para comprar.");
+    if(!carrito.length) return alert("Carrito vacío");
+    document.getElementById('modal-carrito').style.display='none';
+    document.getElementById('modal-checkout').style.display='flex';
+    document.getElementById('checkout-form-view').style.display='block';
+    document.getElementById('checkout-loading').style.display='none';
 }
 
-function setMetodo(tipo) {
-    document.getElementById('form-tarjeta').style.display = (tipo === 'tarjeta') ? 'flex' : 'none';
-    document.getElementById('info-caja').style.display = (tipo === 'caja') ? 'block' : 'none';
+function setMetodo(m) {
+    document.getElementById('form-tarjeta').style.display = m==='tarjeta'?'flex':'none';
+    document.getElementById('info-caja').style.display = m==='caja'?'block':'none';
 }
 
 function procesarPago() {
-    // 1. Ocultar formulario y mostrar carga
-    document.getElementById('checkout-form-view').style.display = 'none';
-    document.getElementById('checkout-loading').style.display = 'block';
-
-    // 2. Simular espera de 2.5 segundos
+    document.getElementById('checkout-form-view').style.display='none';
+    document.getElementById('checkout-loading').style.display='block';
     setTimeout(async () => {
         const metodo = document.querySelector('input[name="pago"]:checked').value;
-        
-        // 3. Enviar al Servidor
         const res = await fetch('/api/comprar', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ carrito, metodoPago: metodo })
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                carrito, 
+                cliente: usuarioActual.nombre, 
+                email: usuarioActual.email, // Enviamos el email para rastrear
+                metodoPago: metodo
+            })
         });
-
         const data = await res.json();
-
-        if (data.success) {
+        if(data.success) {
             imprimirTicket(data.pedidoId, data.total, metodo);
-            carrito = [];
-            actualizarCarritoUI();
-            cargarProductos(); // Refrescar stock visualmente
+            carrito=[]; updateCartUI(); cargarProductos();
+            if(usuarioActual.rol === 'admin') actualizarStatsAdmin();
             cerrarModal('modal-checkout');
-        } else {
-            alert("Error: " + data.error);
-            iniciarCheckout(); // Regresar si falló
-        }
-    }, 2500); 
+        } else alert(data.error);
+    }, 2000);
 }
 
 function imprimirTicket(id, total, metodo) {
-    const fecha = new Date().toLocaleString();
-    let ticket = `
-    🧾 TICKET DE COMPRA - NOVAMARKET
-    ================================
-    Orden:  #${id}
-    Fecha:  ${fecha}
-    Método: ${metodo.toUpperCase()}
-    --------------------------------
-    CANT  PRODUCTO          TOTAL
-    --------------------------------
-    `;
-    carrito.forEach(i => {
-        ticket += `${i.cantidad} x ${i.nombre.substring(0,15)}... $${(i.precio*i.cantidad).toFixed(2)}\n`;
-    });
-    ticket += `
-    --------------------------------
-    TOTAL PAGADO:      $${total}
-    ================================
-    ¡Gracias por tu compra!
-    `;
-    
-    const win = window.open('', '', 'width=350,height=500');
-    win.document.write('<pre style="font-family:monospace">' + ticket + '</pre>');
-    win.print();
+    const win = window.open('','','width=350,height=500');
+    let t = `🧾 NOVAMARKET\nPedido: #${id}\nCliente: ${usuarioActual.nombre}\nMétodo: ${metodo.toUpperCase()}\n----------------\n`;
+    carrito.forEach(i=>t+=`${i.cantidad}x ${i.nombre.substr(0,15)}.. $${(i.precio*i.cantidad).toFixed(2)}\n`);
+    t+=`----------------\nTOTAL: $${total}\n¡Gracias!`;
+    win.document.write(`<pre>${t}</pre>`); win.print();
 }
 
+// --- GESTIÓN DE GERENTE ---
+function verTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(d=>d.style.display='none');
+    document.querySelectorAll('.tab-link').forEach(b=>b.classList.remove('active'));
+    document.getElementById(`tab-${tabName}`).style.display='block';
+    event.target.classList.add('active');
+    if(tabName === 'clientes') cargarClientesAdmin();
+}
 
-// --- DASHBOARD Y ADMIN ---
-async function login() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-pass').value;
-    
-    const res = await fetch('/api/login', {
-        method: 'POST', 
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({email, password})
+async function cargarClientesAdmin() {
+    const res = await fetch('/api/admin/clientes');
+    const lista = await res.json();
+    const tbody = document.getElementById('lista-clientes-admin');
+    tbody.innerHTML = '';
+    lista.forEach(c => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${c.nombre}</td>
+                <td>${c.email}</td>
+                <td>
+                    <button class="btn-info" style="padding:5px;" onclick="verHistorial('${c.email}')">📜 Historial</button>
+                    <button class="btn-danger" style="padding:5px;" onclick="bajaCliente(${c.id})">🗑️ Baja</button>
+                </td>
+            </tr>
+        `;
     });
-    const data = await res.json();
+}
 
-    if(data.success) {
-        esAdmin = true;
-        document.getElementById('admin-bar').style.display = 'flex';
-        cerrarModal('modal-login');
-        renderizarProductos(productos); // Reactivar botones admin
-        actualizarBadgeGerente();
+// NUEVO: Ver Historial de Cliente
+async function verHistorial(email) {
+    document.getElementById('historial-cliente-email').innerText = email;
+    const res = await fetch(`/api/admin/historial/${email}`);
+    const pedidos = await res.json();
+    
+    const cont = document.getElementById('lista-historial');
+    cont.innerHTML = '';
+    
+    if(pedidos.length === 0) {
+        cont.innerHTML = '<p style="padding:10px;">Sin compras registradas.</p>';
     } else {
-        document.getElementById('msg-error').style.display = 'block';
+        pedidos.forEach(p => {
+            cont.innerHTML += `
+                <div style="padding:10px; border-bottom:1px solid #eee;">
+                    <strong>Pedido #${p.id}</strong> - ${new Date(p.fecha).toLocaleDateString()}<br>
+                    Total: $${p.total}
+                </div>`;
+        });
+    }
+    document.getElementById('modal-historial').style.display = 'flex';
+}
+
+async function bajaCliente(id) {
+    if(confirm("¿Eliminar cliente?")) {
+        await fetch(`/api/admin/clientes/${id}`, {method:'DELETE'});
+        cargarClientesAdmin();
     }
 }
 
-async function actualizarBadgeGerente() {
+async function actualizarStatsAdmin() {
     const res = await fetch('/api/admin/stats');
     const data = await res.json();
-    document.getElementById('admin-ventas-total').innerText = `$${parseFloat(data.ingresos).toFixed(2)}`;
-}
-
-async function abrirDashboard() {
-    const res = await fetch('/api/admin/stats');
-    const data = await res.json();
-
+    document.getElementById('admin-ventas-hoy').innerText = `$${parseFloat(data.corteHoy).toFixed(2)}`;
+    document.getElementById('dash-corte').innerText = `$${parseFloat(data.corteHoy).toFixed(2)}`;
     document.getElementById('dash-ingresos').innerText = `$${parseFloat(data.ingresos).toFixed(2)}`;
-    document.getElementById('dash-ventas').innerText = data.ventas;
     document.getElementById('dash-stock').innerText = data.stockBajo;
-
-    // Configurar Gráfica con Chart.js
-    const ctx = document.getElementById('ventasChart').getContext('2d');
     
-    if(chartInstance) chartInstance.destroy(); // Destruir anterior si existe
-
-    const labels = data.topProductos.map(p => p.nombre.split(' ')[0]); // Solo primer nombre
-    const valores = data.topProductos.map(p => p.vendidos);
-
+    const ctx = document.getElementById('ventasChart').getContext('2d');
+    if(chartInstance) chartInstance.destroy();
     chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Unidades Vendidas',
-                data: valores,
-                backgroundColor: ['#e67e22', '#3498db', '#2ecc71', '#9b59b6', '#f1c40f'],
-                borderRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: { y: { beginAtZero: true } },
-            plugins: { legend: { display: false } }
-        }
+        type:'bar', data:{labels:data.topProductos.map(p=>p.nombre.split(' ')[0]), datasets:[{label:'Top Ventas', data:data.topProductos.map(p=>p.vendidos), backgroundColor:'#e67e22'}]}
     });
-
-    document.getElementById('modal-dashboard').style.display = 'flex';
 }
 
-// --- UTILIDADES ---
-function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
-function toggleLogin() { document.getElementById('modal-login').style.display = 'flex'; }
-function logout() { location.reload(); } // Recargar página para cerrar sesión
-
-// CRUD Productos (Simplificado para conectar con HTML)
-let editId = null;
-function abrirModalProducto() { editId=null; document.getElementById('titulo-modal-prod').innerText='Nuevo Producto'; document.getElementById('modal-producto').style.display='flex'; limpiarForm(); }
-function editarProducto(id) { 
-    const p = productos.find(x => x.id == id); editId = id;
-    document.getElementById('titulo-modal-prod').innerText='Editar Producto';
-    document.getElementById('prod-nombre').value = p.nombre;
-    document.getElementById('prod-precio').value = p.precio;
-    document.getElementById('prod-stock').value = p.stock;
-    document.getElementById('prod-cat').value = p.categoria;
-    document.getElementById('prod-img').value = p.imagen_url;
-    document.getElementById('modal-producto').style.display = 'flex';
-}
-function limpiarForm() { 
-    document.getElementById('prod-nombre').value=''; document.getElementById('prod-precio').value='';
-    document.getElementById('prod-stock').value=''; document.getElementById('prod-cat').value=''; document.getElementById('prod-img').value=''; 
+function abrirDashboard() { actualizarStatsAdmin(); verTab('resumen'); document.getElementById('modal-dashboard').style.display='flex'; }
+function hacerCorteCaja() {
+    const total = document.getElementById('dash-corte').innerText;
+    const fecha = new Date().toLocaleDateString();
+    const win = window.open('','','width=400,height=400');
+    win.document.write(`<h2 style="text-align:center">✂️ CORTE</h2><p>Fecha: ${fecha}</p><p>Resp: ${usuarioActual.nombre}</p><hr><h1 style="text-align:center">${total}</h1><hr>`); win.print();
 }
 
-async function guardarProducto() {
-    const body = {
-        nombre: document.getElementById('prod-nombre').value,
-        precio: document.getElementById('prod-precio').value,
-        stock: document.getElementById('prod-stock').value,
-        categoria: document.getElementById('prod-cat').value,
-        imagen_url: document.getElementById('prod-img').value
-    };
+// Helpers
+function toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode')); }
+function checkDarkMode() { if(localStorage.getItem('dark-mode')==='true') document.body.classList.add('dark-mode'); }
+function cerrarModal(id) { document.getElementById(id).style.display='none'; }
+function toggleLogin() { document.getElementById('modal-login').style.display='flex'; }
+function generarCategorias() { const cont = document.getElementById('filtros-categorias'); const cats = ['Todas', ...new Set(productos.map(p=>p.categoria||'Otros'))]; cont.innerHTML = ''; cats.forEach(c => cont.innerHTML+=`<button onclick="filtrar('${c}', this)" class="${c==='Todas'?'active':''}">${c}</button>`); }
+function filtrar(cat, btn) { document.querySelectorAll('.cat-filters button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderizarProductos(cat==='Todas'?productos:productos.filter(p=>(p.categoria||'Otros')===cat)); }
+function filtrarProductos() { const txt = document.getElementById('buscador').value.toLowerCase(); renderizarProductos(productos.filter(p=>p.nombre.toLowerCase().includes(txt))); }
 
-    const url = editId ? `/api/admin/productos/${editId}` : '/api/admin/productos';
-    const method = editId ? 'PUT' : 'POST';
-
-    await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    cerrarModal('modal-producto');
-    cargarProductos();
+// CRUD Prod
+let editId=null;
+function abrirModalProducto(){editId=null; document.getElementById('modal-producto').style.display='flex';}
+function editarProducto(id){const p=productos.find(x=>x.id==id); editId=id; document.getElementById('prod-nombre').value=p.nombre; document.getElementById('prod-precio').value=p.precio; document.getElementById('prod-stock').value=p.stock; document.getElementById('prod-cat').value=p.categoria; document.getElementById('prod-img').value=p.imagen_url; document.getElementById('modal-producto').style.display='flex';}
+async function guardarProducto(){
+    const body={nombre:document.getElementById('prod-nombre').value, precio:document.getElementById('prod-precio').value, stock:document.getElementById('prod-stock').value, categoria:document.getElementById('prod-cat').value, imagen_url:document.getElementById('prod-img').value};
+    const url=editId?`/api/admin/productos/${editId}`:'/api/admin/productos'; const method=editId?'PUT':'POST';
+    await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); cerrarModal('modal-producto'); cargarProductos();
 }
-
-async function borrarProducto(id) {
-    if(confirm('¿Seguro que quieres borrar este producto?')) {
-        await fetch(`/api/admin/productos/${id}`, { method: 'DELETE' });
-        cargarProductos();
-    }
-}
+async function borrarProducto(id){if(confirm('¿Borrar?')){await fetch(`/api/admin/productos/${id}`,{method:'DELETE'});cargarProductos();}}

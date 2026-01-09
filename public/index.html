@@ -11,36 +11,38 @@
     <header>
         <div style="display:flex; align-items:center; gap:15px;">
             <h1>🛒 NovaMarket</h1>
-            <button onclick="toggleDarkMode()" style="background:rgba(255,255,255,0.2); color:white; padding:5px 10px; font-size:1.2rem;">🌙</button>
+            <button onclick="toggleDarkMode()" class="btn-icon">🌙</button>
         </div>
         
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div id="user-info" style="display:none; color:white; font-size:0.9rem; text-align:right;">
+                Hola, <span id="user-name" style="font-weight:bold;">Usuario</span><br>
+                <small id="user-role" style="opacity:0.8">Cliente</small>
+            </div>
             <button class="btn-accent" onclick="abrirCarrito()">
-                🛍️ Carrito <span id="badge-count" class="badge">0</span>
+                🛍️ <span id="badge-count" class="badge">0</span>
             </button>
-            <button class="btn-primary" onclick="toggleLogin()">Soy Gerente</button>
+            <button id="btn-login-main" class="btn-primary" onclick="toggleLogin()">Ingresar</button>
+            <button id="btn-logout-main" class="btn-danger" style="display:none;" onclick="logout()">Salir</button>
         </div>
     </header>
 
     <div id="admin-bar" class="admin-bar">
         <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-weight:bold;">🔐 MODO GERENTE</span>
-            <span class="stat-badge">Ventas Hoy: <span id="admin-ventas-total">$0.00</span></span>
+            <span style="font-weight:bold;">🔐 GERENCIA</span>
+            <span class="stat-badge">Ventas Hoy: <span id="admin-ventas-hoy">$0.00</span></span>
         </div>
         <div>
-            <button class="btn-info" onclick="abrirDashboard()">📊 Ver Gráficas</button>
+            <button class="btn-info" onclick="abrirDashboard()">📊 Panel Control</button>
             <button class="btn-success" onclick="abrirModalProducto()">+ Producto</button>
-            <button class="btn-danger" onclick="logout()">Salir</button>
         </div>
     </div>
 
     <div class="container">
         <div class="controls-panel">
             <input type="text" id="buscador" placeholder="🔍 Buscar productos..." onkeyup="filtrarProductos()">
-            <div id="filtros-categorias" class="cat-filters">
-                </div>
+            <div id="filtros-categorias" class="cat-filters"></div>
         </div>
-
         <h2>Nuestros Productos</h2>
         <div id="grid-productos" class="grid"></div>
     </div>
@@ -49,97 +51,109 @@
         <div class="modal-content">
             <h2>Tu Carrito 🛒</h2>
             <div id="lista-carrito" class="cart-list"></div>
-            
-            <div class="cart-summary">
-                <p>Total a Pagar: <strong style="font-size:1.4rem">$<span id="total-carrito">0.00</span></strong></p>
-                <small>Artículos: <span id="items-count">0</span></small>
-            </div>
-
-            <button class="btn-success full-width" onclick="iniciarCheckout()">Proceder al Pago</button>
-            <button class="btn-secondary full-width" onclick="cerrarModal('modal-carrito')">Seguir comprando</button>
+            <div class="cart-summary"><p>Total: <strong style="font-size:1.4rem">$<span id="total-carrito">0.00</span></strong></p></div>
+            <button class="btn-success full-width" onclick="iniciarCheckout()">Pagar</button>
+            <button class="btn-secondary full-width" onclick="cerrarModal('modal-carrito')">Cerrar</button>
         </div>
     </div>
 
     <div id="modal-checkout" class="modal">
         <div class="modal-content checkout-content">
             <h2>Finalizar Compra</h2>
-            
             <div id="checkout-form-view">
-                <p style="margin-bottom:15px;">Selecciona método de pago:</p>
-                
+                <p>Método de pago:</p>
                 <div class="payment-options">
                     <label class="payment-card" onclick="setMetodo('tarjeta')">
-                        <input type="radio" name="pago" value="tarjeta" checked>
-                        <span>💳 Tarjeta</span>
+                        <input type="radio" name="pago" value="tarjeta" checked> <span>💳 Tarjeta</span>
                     </label>
                     <label class="payment-card" onclick="setMetodo('caja')">
-                        <input type="radio" name="pago" value="caja">
-                        <span>💵 Efectivo</span>
+                        <input type="radio" name="pago" value="caja"> <span>💵 Efectivo</span>
                     </label>
                 </div>
-
                 <div id="form-tarjeta" class="fake-form">
-                    <input type="text" placeholder="Número de Tarjeta (0000 0000 0000 0000)" maxlength="19">
-                    <div style="display:flex; gap:10px;">
-                        <input type="text" placeholder="MM/AA" style="width:50%">
-                        <input type="text" placeholder="CVV" style="width:50%">
-                    </div>
-                    <input type="text" placeholder="Nombre del Titular">
+                    <input type="text" placeholder="0000 0000 0000 0000">
+                    <div style="display:flex; gap:10px;"><input type="text" placeholder="MM/AA"><input type="text" placeholder="CVV"></div>
                 </div>
-
-                <div id="info-caja" class="fake-form" style="display:none; text-align:center; padding:20px; background:rgba(0,0,0,0.05); border-radius:8px;">
-                    <p>📦 <strong>Pago en Caja</strong></p>
-                    <p>Recoge tu pedido en mostrador presentando tu ticket.</p>
+                <div id="info-caja" class="fake-form" style="display:none; padding:15px; background:rgba(0,0,0,0.05);">
+                    <p>📦 Paga al recoger en caja.</p>
                 </div>
-
-                <button class="btn-success full-width" onclick="procesarPago()">Confirmar Pago ($<span id="checkout-total">0.00</span>)</button>
+                <button class="btn-success full-width" onclick="procesarPago()">Confirmar</button>
                 <button class="btn-secondary full-width" onclick="cerrarModal('modal-checkout')">Cancelar</button>
             </div>
-
             <div id="checkout-loading" style="display:none; text-align:center; padding:30px;">
-                <div class="spinner"></div>
-                <h3>Procesando pago...</h3>
-                <p>Por favor no cierres la ventana.</p>
+                <div class="spinner"></div><h3>Procesando...</h3>
             </div>
-
         </div>
     </div>
 
     <div id="modal-dashboard" class="modal">
-        <div class="modal-content" style="max-width: 700px;">
-            <h2>📊 Reporte Ejecutivo</h2>
-            
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h4>Ingresos Totales</h4>
-                    <p class="stat-num c-green" id="dash-ingresos">$0</p>
-                </div>
-                <div class="stat-card">
-                    <h4>Ventas Realizadas</h4>
-                    <p class="stat-num c-blue" id="dash-ventas">0</p>
-                </div>
-                <div class="stat-card">
-                    <h4>Stock Crítico</h4>
-                    <p class="stat-num c-red" id="dash-stock">0</p>
-                </div>
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="tabs">
+                <button class="tab-link active" onclick="verTab('resumen')">📊 Resumen</button>
+                <button class="tab-link" onclick="verTab('clientes')">👥 Clientes</button>
+                <button class="tab-link" onclick="verTab('config')">⚙️ Config</button>
             </div>
 
-            <div class="chart-wrapper">
-                <canvas id="ventasChart"></canvas>
+            <div id="tab-resumen" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card"><h4>Ventas Hoy</h4><p class="stat-num c-green" id="dash-corte">$0</p></div>
+                    <div class="stat-card"><h4>Total Histórico</h4><p class="stat-num c-blue" id="dash-ingresos">$0</p></div>
+                    <div class="stat-card"><h4>Stock Crítico</h4><p class="stat-num c-red" id="dash-stock">0</p></div>
+                </div>
+                <div class="chart-wrapper"><canvas id="ventasChart"></canvas></div>
+                <button class="btn-primary full-width" onclick="hacerCorteCaja()">✂️ CORTE DE CAJA</button>
             </div>
 
-            <button class="btn-secondary full-width" onclick="cerrarModal('modal-dashboard')">Cerrar Dashboard</button>
+            <div id="tab-clientes" class="tab-content">
+                <h2>Cartera de Clientes</h2>
+                <table class="data-table">
+                    <thead><tr><th>Nombre</th><th>Email</th><th>Acciones</th></tr></thead>
+                    <tbody id="lista-clientes-admin"></tbody>
+                </table>
+            </div>
+
+            <div id="tab-config" class="tab-content">
+                <h3>Seguridad</h3>
+                <input type="password" id="new-admin-pass" placeholder="Nueva clave de Gerente">
+                <button class="btn-success full-width" onclick="cambiarPasswordAdmin()">Actualizar Contraseña</button>
+            </div>
+            <button class="btn-secondary full-width" onclick="cerrarModal('modal-dashboard')">Cerrar</button>
+        </div>
+    </div>
+
+    <div id="modal-historial" class="modal">
+        <div class="modal-content">
+            <h3>Historial de Compras</h3>
+            <p>Cliente: <span id="historial-cliente-email" style="font-weight:bold;"></span></p>
+            <div id="lista-historial" style="max-height:300px; overflow-y:auto; margin-top:10px; border:1px solid #eee;">
+                </div>
+            <button class="btn-secondary full-width" onclick="cerrarModal('modal-historial')">Cerrar</button>
         </div>
     </div>
 
     <div id="modal-login" class="modal">
         <div class="modal-content narrow">
-            <h3>Acceso Gerente</h3>
-            <p id="msg-error" class="error-msg">Datos incorrectos</p>
-            <input type="email" id="login-email" placeholder="Email">
-            <input type="password" id="login-pass" placeholder="Contraseña">
-            <button class="btn-primary full-width" onclick="login()">Entrar</button>
-            <button class="btn-secondary full-width" onclick="cerrarModal('modal-login')">Cancelar</button>
+            <div id="form-login">
+                <h3>Iniciar Sesión</h3>
+                <p id="msg-error" class="error-msg">Datos incorrectos</p>
+                <input type="email" id="login-email" placeholder="Email">
+                <input type="password" id="login-pass" placeholder="Contraseña">
+                <button class="btn-primary full-width" onclick="login()">Entrar</button>
+                <p style="text-align:center; font-size:0.9rem; margin-top:10px;">
+                    ¿No tienes cuenta? <a href="#" onclick="toggleRegistro()">Regístrate aquí</a>
+                </p>
+                <button class="btn-secondary full-width" onclick="cerrarModal('modal-login')">Cancelar</button>
+            </div>
+            <div id="form-registro" style="display:none;">
+                <h3>Crear Cuenta</h3>
+                <input type="text" id="reg-nombre" placeholder="Nombre completo">
+                <input type="email" id="reg-email" placeholder="Correo electrónico">
+                <input type="password" id="reg-pass" placeholder="Contraseña">
+                <button class="btn-success full-width" onclick="registrarCliente()">Registrarme</button>
+                <p style="text-align:center; font-size:0.9rem; margin-top:10px;">
+                    <a href="#" onclick="toggleRegistro()">Volver al Login</a>
+                </p>
+            </div>
         </div>
     </div>
 
@@ -148,10 +162,7 @@
             <h3 id="titulo-modal-prod">Producto</h3>
             <input type="hidden" id="prod-id">
             <input type="text" id="prod-nombre" placeholder="Nombre">
-            <div style="display:flex; gap:10px;">
-                <input type="number" id="prod-precio" placeholder="Precio">
-                <input type="number" id="prod-stock" placeholder="Stock">
-            </div>
+            <div style="display:flex; gap:10px;"><input type="number" id="prod-precio" placeholder="Precio"><input type="number" id="prod-stock" placeholder="Stock"></div>
             <input type="text" id="prod-cat" placeholder="Categoría">
             <input type="text" id="prod-img" placeholder="URL Imagen">
             <button class="btn-success full-width" onclick="guardarProducto()">Guardar</button>
