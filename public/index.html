@@ -5,98 +5,157 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NovaMarket | Tienda Online</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <header>
-        <h1>🛒 NovaMarket</h1>
+        <div style="display:flex; align-items:center; gap:15px;">
+            <h1>🛒 NovaMarket</h1>
+            <button onclick="toggleDarkMode()" style="background:rgba(255,255,255,0.2); color:white; padding:5px 10px; font-size:1.2rem;">🌙</button>
+        </div>
+        
         <div style="display: flex; gap: 10px;">
             <button class="btn-accent" onclick="abrirCarrito()">
-                🛍️ Carrito (<span id="count">0</span>)
+                🛍️ Carrito <span id="badge-count" class="badge">0</span>
             </button>
             <button class="btn-primary" onclick="toggleLogin()">Soy Gerente</button>
         </div>
     </header>
 
     <div id="admin-bar" class="admin-bar">
-        <span>🔐 Modo Gerente Activo &nbsp;</span>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-weight:bold;">🔐 MODO GERENTE</span>
+            <span class="stat-badge">Ventas Hoy: <span id="admin-ventas-total">$0.00</span></span>
+        </div>
         <div>
-            <button class="btn-success" style="width: auto; margin: 0;" onclick="abrirModalProducto()">+ Nuevo Producto</button>
-            <button class="btn-danger" style="width: auto; margin: 0;" onclick="logout()">Salir</button>
+            <button class="btn-info" onclick="abrirDashboard()">📊 Ver Gráficas</button>
+            <button class="btn-success" onclick="abrirModalProducto()">+ Producto</button>
+            <button class="btn-danger" onclick="logout()">Salir</button>
         </div>
     </div>
 
     <div class="container">
-        
-        <h2 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">Catálogo de Productos</h2>
-
         <div class="controls-panel">
-            <div class="search-box">
-                <span class="material-icons" style="color: #999;">search</span>
-                <input type="text" id="buscador" placeholder="Buscar colchas, juguetes..." onkeyup="filtrarProductos()">
-            </div>
-
+            <input type="text" id="buscador" placeholder="🔍 Buscar productos..." onkeyup="filtrarProductos()">
             <div id="filtros-categorias" class="cat-filters">
-                <button class="btn-cat active" onclick="filtrarPorCategoria('Todas')">Todas</button>
                 </div>
         </div>
 
+        <h2>Nuestros Productos</h2>
         <div id="grid-productos" class="grid"></div>
     </div>
 
     <div id="modal-carrito" class="modal">
         <div class="modal-content">
-            <h2>Tu Carrito de Compras</h2>
-            <div id="lista-carrito" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px;"></div>
-            <h3 style="text-align: right;">Total: $<span id="total-carrito">0.00</span></h3>
-            <button class="btn-success" onclick="pagar()">✅ Pagar e Imprimir Ticket</button>
-            <button onclick="cerrarModal('modal-carrito')" style="width: 100%; margin-top: 10px; background: #ddd;">Seguir comprando</button>
+            <h2>Tu Carrito 🛒</h2>
+            <div id="lista-carrito" class="cart-list"></div>
+            
+            <div class="cart-summary">
+                <p>Total a Pagar: <strong style="font-size:1.4rem">$<span id="total-carrito">0.00</span></strong></p>
+                <small>Artículos: <span id="items-count">0</span></small>
+            </div>
+
+            <button class="btn-success full-width" onclick="iniciarCheckout()">Proceder al Pago</button>
+            <button class="btn-secondary full-width" onclick="cerrarModal('modal-carrito')">Seguir comprando</button>
+        </div>
+    </div>
+
+    <div id="modal-checkout" class="modal">
+        <div class="modal-content checkout-content">
+            <h2>Finalizar Compra</h2>
+            
+            <div id="checkout-form-view">
+                <p style="margin-bottom:15px;">Selecciona método de pago:</p>
+                
+                <div class="payment-options">
+                    <label class="payment-card" onclick="setMetodo('tarjeta')">
+                        <input type="radio" name="pago" value="tarjeta" checked>
+                        <span>💳 Tarjeta</span>
+                    </label>
+                    <label class="payment-card" onclick="setMetodo('caja')">
+                        <input type="radio" name="pago" value="caja">
+                        <span>💵 Efectivo</span>
+                    </label>
+                </div>
+
+                <div id="form-tarjeta" class="fake-form">
+                    <input type="text" placeholder="Número de Tarjeta (0000 0000 0000 0000)" maxlength="19">
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" placeholder="MM/AA" style="width:50%">
+                        <input type="text" placeholder="CVV" style="width:50%">
+                    </div>
+                    <input type="text" placeholder="Nombre del Titular">
+                </div>
+
+                <div id="info-caja" class="fake-form" style="display:none; text-align:center; padding:20px; background:rgba(0,0,0,0.05); border-radius:8px;">
+                    <p>📦 <strong>Pago en Caja</strong></p>
+                    <p>Recoge tu pedido en mostrador presentando tu ticket.</p>
+                </div>
+
+                <button class="btn-success full-width" onclick="procesarPago()">Confirmar Pago ($<span id="checkout-total">0.00</span>)</button>
+                <button class="btn-secondary full-width" onclick="cerrarModal('modal-checkout')">Cancelar</button>
+            </div>
+
+            <div id="checkout-loading" style="display:none; text-align:center; padding:30px;">
+                <div class="spinner"></div>
+                <h3>Procesando pago...</h3>
+                <p>Por favor no cierres la ventana.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="modal-dashboard" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <h2>📊 Reporte Ejecutivo</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>Ingresos Totales</h4>
+                    <p class="stat-num c-green" id="dash-ingresos">$0</p>
+                </div>
+                <div class="stat-card">
+                    <h4>Ventas Realizadas</h4>
+                    <p class="stat-num c-blue" id="dash-ventas">0</p>
+                </div>
+                <div class="stat-card">
+                    <h4>Stock Crítico</h4>
+                    <p class="stat-num c-red" id="dash-stock">0</p>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <canvas id="ventasChart"></canvas>
+            </div>
+
+            <button class="btn-secondary full-width" onclick="cerrarModal('modal-dashboard')">Cerrar Dashboard</button>
         </div>
     </div>
 
     <div id="modal-login" class="modal">
-        <div class="modal-content" style="max-width: 350px;">
-            <h2 style="text-align: center;">Acceso Gerente</h2>
-            <p id="msg-error" class="error-msg">⚠️ Usuario o contraseña incorrectos</p>
-
-            <label>Correo Electrónico</label>
-            <input type="email" id="login-email" placeholder="ejemplo: admin@nova.com">
-            
-            <label>Contraseña</label>
-            <input type="password" id="login-pass" placeholder="••••••">
-            
-            <button class="btn-primary" style="width: 100%; margin-top: 15px; background: var(--primary); color: white;" onclick="login()">Entrar al Sistema</button>
-            <button onclick="cerrarModal('modal-login')" style="width: 100%; margin-top: 10px;">Cancelar</button>
+        <div class="modal-content narrow">
+            <h3>Acceso Gerente</h3>
+            <p id="msg-error" class="error-msg">Datos incorrectos</p>
+            <input type="email" id="login-email" placeholder="Email">
+            <input type="password" id="login-pass" placeholder="Contraseña">
+            <button class="btn-primary full-width" onclick="login()">Entrar</button>
+            <button class="btn-secondary full-width" onclick="cerrarModal('modal-login')">Cancelar</button>
         </div>
     </div>
 
     <div id="modal-producto" class="modal">
         <div class="modal-content">
-            <h2 id="titulo-modal-prod">Gestión Producto</h2>
+            <h3 id="titulo-modal-prod">Producto</h3>
             <input type="hidden" id="prod-id">
-            
-            <label>Nombre</label>
-            <input type="text" id="prod-nombre" placeholder="Nombre del Producto">
-            
-            <div style="display: flex; gap: 10px;">
-                <div style="flex:1">
-                    <label>Precio ($)</label>
-                    <input type="number" id="prod-precio" placeholder="0.00">
-                </div>
-                <div style="flex:1">
-                    <label>Stock</label>
-                    <input type="number" id="prod-stock" placeholder="0">
-                </div>
+            <input type="text" id="prod-nombre" placeholder="Nombre">
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="prod-precio" placeholder="Precio">
+                <input type="number" id="prod-stock" placeholder="Stock">
             </div>
-
-            <label>Categoría</label>
-            <input type="text" id="prod-cat" placeholder="Ej: Hogar, Juguetes">
-            
-            <label>Imagen (URL)</label>
-            <input type="text" id="prod-img" placeholder="https://...">
-            
-            <button class="btn-success" onclick="guardarProducto()">💾 Guardar Cambios</button>
-            <button onclick="cerrarModal('modal-producto')" style="width: 100%; margin-top: 10px;">Cancelar</button>
+            <input type="text" id="prod-cat" placeholder="Categoría">
+            <input type="text" id="prod-img" placeholder="URL Imagen">
+            <button class="btn-success full-width" onclick="guardarProducto()">Guardar</button>
+            <button class="btn-secondary full-width" onclick="cerrarModal('modal-producto')">Cancelar</button>
         </div>
     </div>
 

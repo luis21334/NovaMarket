@@ -1,113 +1,66 @@
 let carrito = [];
+let productos = [];
 let esAdmin = false;
-let productos = []; // Lista global de productos
+let chartInstance = null; // Instancia de la gráfica
 
-document.addEventListener('DOMContentLoaded', cargarProductos);
+document.addEventListener('DOMContentLoaded', () => {
+    cargarProductos();
+    checkDarkMode();
+});
 
-// --- CARGA DE DATOS ---
+// --- MODO OSCURO ---
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode'));
+}
+function checkDarkMode() {
+    if(localStorage.getItem('dark-mode') === 'true') document.body.classList.add('dark-mode');
+}
+
+// --- PRODUCTOS ---
 async function cargarProductos() {
     try {
         const res = await fetch('/api/productos');
         productos = await res.json();
-        
-        // 1. Generar botones de categorías basados en lo que hay
         generarBotonesCategorias();
-        
-        // 2. Mostrar todos los productos al inicio
         renderizarProductos(productos);
-    } catch (error) {
-        console.error("Error cargando productos:", error);
-    }
+    } catch (e) { console.error("Error:", e); }
 }
 
-// --- LÓGICA DE FILTROS Y BÚSQUEDA ---
-function generarBotonesCategorias() {
-    const contenedor = document.getElementById('filtros-categorias');
-    // Obtener categorías únicas, limpiando vacíos
-    const categorias = ['Todas', ...new Set(productos.map(p => p.categoria || 'Otros'))];
-    
-    contenedor.innerHTML = ''; // Limpiar
-
-    categorias.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.innerText = cat;
-        btn.className = cat === 'Todas' ? 'btn-cat active' : 'btn-cat';
-        btn.onclick = () => {
-            // Quitar clase active a todos
-            document.querySelectorAll('.btn-cat').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            filtrarPorCategoria(cat);
-        };
-        contenedor.appendChild(btn);
-    });
-}
-
-function filtrarPorCategoria(categoria) {
-    if (categoria === 'Todas') {
-        renderizarProductos(productos);
-    } else {
-        // Filtrar productos que coincidan con la categoría (o 'Otros' si es null)
-        const filtrados = productos.filter(p => (p.categoria || 'Otros') === categoria);
-        renderizarProductos(filtrados);
-    }
-}
-
-function filtrarProductos() {
-    const texto = document.getElementById('buscador').value.toLowerCase();
-    const filtrados = productos.filter(p => 
-        p.nombre.toLowerCase().includes(texto) || 
-        (p.categoria && p.categoria.toLowerCase().includes(texto))
-    );
-    renderizarProductos(filtrados);
-}
-
-// --- RENDERIZADO (VISUALIZACIÓN) ---
 function renderizarProductos(lista) {
-    const contenedor = document.getElementById('grid-productos');
-    contenedor.innerHTML = '';
-
-    if (lista.length === 0) {
-        contenedor.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;"><h3>😕 No encontramos productos con esa búsqueda.</h3></div>';
+    const grid = document.getElementById('grid-productos');
+    grid.innerHTML = '';
+    
+    if(lista.length === 0) {
+        grid.innerHTML = '<p style="grid-column:1/-1; text-align:center">No se encontraron productos.</p>';
         return;
     }
 
     lista.forEach(p => {
-        // Botones de Admin
-        let adminBtns = '';
-        if (esAdmin) {
-            adminBtns = `
-                <div style="display:flex; gap:5px; margin-top:10px;">
-                    <button style="flex:1; padding:5px; font-size:0.8rem;" onclick="editarProducto(${p.id})">✏️</button>
-                    <button class="btn-danger" style="flex:1; padding:5px; font-size:0.8rem;" onclick="borrarProducto(${p.id})">🗑️</button>
-                </div>
-            `;
-        }
+        // Controles de Admin (Editar/Borrar)
+        const adminHtml = esAdmin ? `
+            <div style="display:flex; gap:5px; margin-bottom:10px;">
+                <button onclick="editarProducto(${p.id})" class="btn-info" style="font-size:0.8rem; padding:5px 10px;">✏️ Editar</button>
+                <button onclick="borrarProducto(${p.id})" class="btn-danger" style="font-size:0.8rem; padding:5px 10px;">🗑️ Borrar</button>
+            </div>` : '';
 
-        // Lógica de Stock
-        const stockHtml = p.stock > 0 
-            ? `<span class="stock-badge">Disponibles: ${p.stock}</span>`
-            : `<span class="stock-badge stock-low">Agotado</span>`;
-
+        // Botón de Compra
         const btnCompra = p.stock > 0 
-            ? `<button class="btn-accent" style="width:100%" onclick="agregarCarrito(${p.id})">Agregar al Carrito</button>`
-            : `<button style="width:100%; background:#ccc; cursor:not-allowed;" disabled>Sin Stock</button>`;
+            ? `<button class="btn-accent full-width" onclick="agregarCarrito(${p.id})">Agregar al Carrito</button>`
+            : `<button class="btn-secondary full-width" disabled style="opacity:0.6">Agotado</button>`;
 
-        // Categoría por defecto
-        const cat = p.categoria || 'General';
-
-        contenedor.innerHTML += `
+        grid.innerHTML += `
             <div class="card">
-                <img src="${p.imagen_url}" alt="${p.nombre}" onerror="this.src='https://via.placeholder.com/300?text=Sin+Imagen'">
+                <img src="${p.imagen_url}" onerror="this.src='https://via.placeholder.com/300?text=Sin+Imagen'">
                 <div class="card-body">
                     <div>
-                        <div class="card-cat">${cat}</div>
-                        <div class="card-title">${p.nombre}</div>
-                        ${stockHtml}
+                        <span class="card-cat">${p.categoria || 'Varios'}</span>
+                        <h3>${p.nombre}</h3>
                         <div class="card-price">$${p.precio}</div>
+                        <small style="color:${p.stock<5?'#e74c3c':'#27ae60'}">Stock: ${p.stock}</small>
                     </div>
-                    <div>
-                        ${adminBtns}
-                        <br>
+                    <div style="margin-top:10px;">
+                        ${adminHtml}
                         ${btnCompra}
                     </div>
                 </div>
@@ -116,217 +69,268 @@ function renderizarProductos(lista) {
     });
 }
 
+// --- FILTROS ---
+function generarBotonesCategorias() {
+    const cont = document.getElementById('filtros-categorias');
+    const cats = ['Todas', ...new Set(productos.map(p => p.categoria || 'Otros'))];
+    cont.innerHTML = '';
+    cats.forEach(c => {
+        cont.innerHTML += `<button onclick="filtrarCat('${c}', this)" class="${c==='Todas'?'active':''}">${c}</button>`;
+    });
+}
+
+function filtrarCat(cat, btn) {
+    document.querySelectorAll('.cat-filters button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filtrados = cat === 'Todas' ? productos : productos.filter(p => (p.categoria||'Otros') === cat);
+    renderizarProductos(filtrados);
+}
+
+function filtrarProductos() {
+    const txt = document.getElementById('buscador').value.toLowerCase();
+    const filtrados = productos.filter(p => p.nombre.toLowerCase().includes(txt));
+    renderizarProductos(filtrados);
+}
+
 // --- CARRITO ---
 function agregarCarrito(id) {
     const prod = productos.find(p => p.id === id);
-    const enCarrito = carrito.find(item => item.id === id);
-    const cantidadActual = enCarrito ? enCarrito.cantidad : 0;
+    const item = carrito.find(i => i.id === id);
 
-    if (cantidadActual >= prod.stock) {
-        alert("⚠️ ¡No puedes agregar más! Alcanzaste el stock disponible.");
-        return;
-    }
-
-    if (enCarrito) {
-        enCarrito.cantidad++;
+    if (item) {
+        if (item.cantidad >= prod.stock) return alert("¡No puedes agregar más de lo que hay en stock!");
+        item.cantidad++;
     } else {
-        carrito.push({ id: prod.id, nombre: prod.nombre, precio: prod.precio, cantidad: 1 });
+        carrito.push({ ...prod, cantidad: 1 });
     }
-    actualizarUI();
-    abrirCarrito(); // Opcional: abre el carrito al agregar
+    actualizarCarritoUI();
 }
 
-function actualizarUI() {
-    document.getElementById('count').innerText = carrito.reduce((acc, item) => acc + item.cantidad, 0);
-}
+function actualizarCarritoUI() {
+    const count = carrito.reduce((acc, item) => acc + item.cantidad, 0);
+    const total = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
 
-function abrirCarrito() {
+    // Actualizar Badges y Textos
+    document.getElementById('badge-count').innerText = count;
+    document.getElementById('items-count').innerText = count;
+    document.getElementById('total-carrito').innerText = total.toFixed(2);
+    document.getElementById('checkout-total').innerText = total.toFixed(2);
+
+    // Renderizar Lista
     const lista = document.getElementById('lista-carrito');
     lista.innerHTML = '';
-    let total = 0;
+    
+    if(carrito.length === 0) lista.innerHTML = '<p style="text-align:center">Carrito vacío.</p>';
 
-    if(carrito.length === 0) {
-        lista.innerHTML = '<p style="text-align:center">Tu carrito está vacío 🛒</p>';
-    }
-
-    carrito.forEach((item, index) => {
-        const subtotal = item.precio * item.cantidad;
-        total += subtotal;
+    carrito.forEach((item, idx) => {
         lista.innerHTML += `
-            <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:10px 0;">
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:8px 0;">
                 <div>
                     <strong>${item.nombre}</strong><br>
-                    <small>$${item.precio} x ${item.cantidad}</small>
+                    <small>${item.cantidad} x $${item.precio}</small>
                 </div>
                 <div style="text-align:right">
-                    <strong>$${subtotal.toFixed(2)}</strong><br>
-                    <button style="color:red; background:none; padding:0;" onclick="eliminarItem(${index})">Eliminar</button>
+                    <strong>$${(item.cantidad * item.precio).toFixed(2)}</strong><br>
+                    <button onclick="eliminarDelCarrito(${idx})" style="color:#e74c3c; background:none; padding:0; font-size:0.8rem;">Eliminar</button>
                 </div>
             </div>
         `;
     });
+}
 
-    document.getElementById('total-carrito').innerText = total.toFixed(2);
+function eliminarDelCarrito(idx) {
+    carrito.splice(idx, 1);
+    actualizarCarritoUI();
+}
+
+function abrirCarrito() {
     document.getElementById('modal-carrito').style.display = 'flex';
 }
 
-function eliminarItem(index) {
-    carrito.splice(index, 1);
-    abrirCarrito();
-    actualizarUI();
+// --- CHECKOUT (SIMULACIÓN DE PAGO) ---
+function iniciarCheckout() {
+    if(carrito.length === 0) return alert("El carrito está vacío");
+    document.getElementById('modal-carrito').style.display = 'none';
+    
+    // Resetear Estado del Modal Checkout
+    document.getElementById('checkout-form-view').style.display = 'block';
+    document.getElementById('checkout-loading').style.display = 'none';
+    document.getElementById('modal-checkout').style.display = 'flex';
 }
 
-async function pagar() {
-    if (carrito.length === 0) return alert("Carrito vacío");
-
-    const res = await fetch('/api/comprar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ carrito, cliente: "Cliente Web" })
-    });
-
-    const data = await res.json();
-    if (data.success) {
-        imprimirTicket(data.pedidoId, data.total);
-        carrito = [];
-        actualizarUI();
-        cerrarModal('modal-carrito');
-        cargarProductos(); // Recargar para actualizar stock visualmente
-    } else {
-        alert("Error: " + data.error);
-    }
+function setMetodo(tipo) {
+    document.getElementById('form-tarjeta').style.display = (tipo === 'tarjeta') ? 'flex' : 'none';
+    document.getElementById('info-caja').style.display = (tipo === 'caja') ? 'block' : 'none';
 }
 
-function imprimirTicket(id, total) {
+function procesarPago() {
+    // 1. Ocultar formulario y mostrar carga
+    document.getElementById('checkout-form-view').style.display = 'none';
+    document.getElementById('checkout-loading').style.display = 'block';
+
+    // 2. Simular espera de 2.5 segundos
+    setTimeout(async () => {
+        const metodo = document.querySelector('input[name="pago"]:checked').value;
+        
+        // 3. Enviar al Servidor
+        const res = await fetch('/api/comprar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ carrito, metodoPago: metodo })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            imprimirTicket(data.pedidoId, data.total, metodo);
+            carrito = [];
+            actualizarCarritoUI();
+            cargarProductos(); // Refrescar stock visualmente
+            cerrarModal('modal-checkout');
+        } else {
+            alert("Error: " + data.error);
+            iniciarCheckout(); // Regresar si falló
+        }
+    }, 2500); 
+}
+
+function imprimirTicket(id, total, metodo) {
+    const fecha = new Date().toLocaleString();
     let ticket = `
+    🧾 TICKET DE COMPRA - NOVAMARKET
     ================================
-          NOVAMARKET - TICKET
-    ================================
-    Pedido ID: #${id}
-    Fecha: ${new Date().toLocaleString()}
+    Orden:  #${id}
+    Fecha:  ${fecha}
+    Método: ${metodo.toUpperCase()}
     --------------------------------
     CANT  PRODUCTO          TOTAL
     --------------------------------
     `;
-    carrito.forEach(item => {
-        const sub = (item.precio * item.cantidad).toFixed(2);
-        const nombre = item.nombre.substring(0,15).padEnd(15);
-        ticket += `${item.cantidad}x   ${nombre} $${sub}\n`;
+    carrito.forEach(i => {
+        ticket += `${i.cantidad} x ${i.nombre.substring(0,15)}... $${(i.precio*i.cantidad).toFixed(2)}\n`;
     });
     ticket += `
     --------------------------------
-    TOTAL PAGADO:       $${total}
+    TOTAL PAGADO:      $${total}
     ================================
-    ¡Gracias por su compra!
+    ¡Gracias por tu compra!
     `;
     
-    const ventana = window.open('', '', 'width=400,height=600');
-    ventana.document.write('<pre style="font-family: monospace;">' + ticket + '</pre>');
-    ventana.document.close();
-    ventana.print();
+    const win = window.open('', '', 'width=350,height=500');
+    win.document.write('<pre style="font-family:monospace">' + ticket + '</pre>');
+    win.print();
 }
 
-// --- FUNCIONES ADMIN ---
-function toggleLogin() { document.getElementById('modal-login').style.display = 'flex'; }
-function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
 
+// --- DASHBOARD Y ADMIN ---
 async function login() {
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-pass').value;
-    const errorMsg = document.getElementById('msg-error');
+    
+    const res = await fetch('/api/login', {
+        method: 'POST', 
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
 
-    errorMsg.style.display = 'none'; // Reset error
-
-    if(!email || !password) {
-        errorMsg.innerText = "Por favor llena ambos campos";
-        errorMsg.style.display = 'block';
-        return;
+    if(data.success) {
+        esAdmin = true;
+        document.getElementById('admin-bar').style.display = 'flex';
+        cerrarModal('modal-login');
+        renderizarProductos(productos); // Reactivar botones admin
+        actualizarBadgeGerente();
+    } else {
+        document.getElementById('msg-error').style.display = 'block';
     }
+}
 
-    try {
-        const res = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
+async function actualizarBadgeGerente() {
+    const res = await fetch('/api/admin/stats');
+    const data = await res.json();
+    document.getElementById('admin-ventas-total').innerText = `$${parseFloat(data.ingresos).toFixed(2)}`;
+}
 
-        if (data.success) {
-            esAdmin = true;
-            document.getElementById('admin-bar').style.display = 'flex'; // Flex para alinear botones
-            cerrarModal('modal-login');
-            renderizarProductos(productos); // Recargar para mostrar botones de editar
-            // Limpiar inputs
-            document.getElementById('login-email').value = '';
-            document.getElementById('login-pass').value = '';
-        } else {
-            errorMsg.innerText = "Usuario o contraseña incorrectos";
-            errorMsg.style.display = 'block';
+async function abrirDashboard() {
+    const res = await fetch('/api/admin/stats');
+    const data = await res.json();
+
+    document.getElementById('dash-ingresos').innerText = `$${parseFloat(data.ingresos).toFixed(2)}`;
+    document.getElementById('dash-ventas').innerText = data.ventas;
+    document.getElementById('dash-stock').innerText = data.stockBajo;
+
+    // Configurar Gráfica con Chart.js
+    const ctx = document.getElementById('ventasChart').getContext('2d');
+    
+    if(chartInstance) chartInstance.destroy(); // Destruir anterior si existe
+
+    const labels = data.topProductos.map(p => p.nombre.split(' ')[0]); // Solo primer nombre
+    const valores = data.topProductos.map(p => p.vendidos);
+
+    chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Unidades Vendidas',
+                data: valores,
+                backgroundColor: ['#e67e22', '#3498db', '#2ecc71', '#9b59b6', '#f1c40f'],
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } },
+            plugins: { legend: { display: false } }
         }
-    } catch (e) {
-        alert("Error de conexión");
-    }
+    });
+
+    document.getElementById('modal-dashboard').style.display = 'flex';
 }
 
-function logout() {
-    esAdmin = false;
-    document.getElementById('admin-bar').style.display = 'none';
-    renderizarProductos(productos);
-}
+// --- UTILIDADES ---
+function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+function toggleLogin() { document.getElementById('modal-login').style.display = 'flex'; }
+function logout() { location.reload(); } // Recargar página para cerrar sesión
 
-// CRUD Admin
-let editandoId = null;
-
-function abrirModalProducto() {
-    editandoId = null;
-    document.getElementById('titulo-modal-prod').innerText = "Nuevo Producto";
-    // Limpiar campos
-    document.getElementById('prod-nombre').value = '';
-    document.getElementById('prod-precio').value = '';
-    document.getElementById('prod-stock').value = '';
-    document.getElementById('prod-img').value = '';
-    document.getElementById('prod-cat').value = '';
-    document.getElementById('modal-producto').style.display = 'flex';
-}
-
-function editarProducto(id) {
-    const p = productos.find(x => x.id === id);
-    editandoId = id;
-    document.getElementById('titulo-modal-prod').innerText = "Editar Producto";
+// CRUD Productos (Simplificado para conectar con HTML)
+let editId = null;
+function abrirModalProducto() { editId=null; document.getElementById('titulo-modal-prod').innerText='Nuevo Producto'; document.getElementById('modal-producto').style.display='flex'; limpiarForm(); }
+function editarProducto(id) { 
+    const p = productos.find(x => x.id == id); editId = id;
+    document.getElementById('titulo-modal-prod').innerText='Editar Producto';
     document.getElementById('prod-nombre').value = p.nombre;
     document.getElementById('prod-precio').value = p.precio;
     document.getElementById('prod-stock').value = p.stock;
-    document.getElementById('prod-img').value = p.imagen_url;
     document.getElementById('prod-cat').value = p.categoria;
+    document.getElementById('prod-img').value = p.imagen_url;
     document.getElementById('modal-producto').style.display = 'flex';
+}
+function limpiarForm() { 
+    document.getElementById('prod-nombre').value=''; document.getElementById('prod-precio').value='';
+    document.getElementById('prod-stock').value=''; document.getElementById('prod-cat').value=''; document.getElementById('prod-img').value=''; 
 }
 
 async function guardarProducto() {
-    const datos = {
+    const body = {
         nombre: document.getElementById('prod-nombre').value,
         precio: document.getElementById('prod-precio').value,
         stock: document.getElementById('prod-stock').value,
-        imagen_url: document.getElementById('prod-img').value,
-        categoria: document.getElementById('prod-cat').value
+        categoria: document.getElementById('prod-cat').value,
+        imagen_url: document.getElementById('prod-img').value
     };
 
-    if(!datos.nombre || !datos.precio) return alert("Nombre y Precio son obligatorios");
+    const url = editId ? `/api/admin/productos/${editId}` : '/api/admin/productos';
+    const method = editId ? 'PUT' : 'POST';
 
-    const url = editandoId ? `/api/admin/productos/${editandoId}` : '/api/admin/productos';
-    const method = editandoId ? 'PUT' : 'POST';
-
-    await fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(datos)
-    });
-
+    await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     cerrarModal('modal-producto');
-    cargarProductos(); // Esto actualizará la lista y los botones de categoría
+    cargarProductos();
 }
 
 async function borrarProducto(id) {
-    if (!confirm("¿Seguro que quieres borrar este producto?")) return;
-    await fetch(`/api/admin/productos/${id}`, { method: 'DELETE' });
-    cargarProductos();
+    if(confirm('¿Seguro que quieres borrar este producto?')) {
+        await fetch(`/api/admin/productos/${id}`, { method: 'DELETE' });
+        cargarProductos();
+    }
 }
