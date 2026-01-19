@@ -190,7 +190,7 @@ function procesarPago() {
 
 function imprimirTicket(id, total, metodo) {
     const win = window.open('','','width=350,height=500');
-    let t = `🧾 La Bodeguita De Lis\nPedido: #${id}\nCliente: ${usuarioActual.nombre}\nMétodo: ${metodo.toUpperCase()}\n----------------\n`;
+    let t = `🧾 La Bodeguita De Liz\nPedido: #${id}\nCliente: ${usuarioActual.nombre}\nMétodo: ${metodo.toUpperCase()}\n----------------\n`;
     carrito.forEach(i=>t+=`${i.cantidad}x ${i.nombre.substr(0,15)}.. $${(i.precio*i.cantidad).toFixed(2)}\n`);
     t+=`----------------\nTOTAL: $${total}\n¡Gracias!`;
     win.document.write(`<pre>${t}</pre>`); win.print();
