@@ -80,7 +80,7 @@ async function registrarCliente() {
     }
 }
 
-
+// --- PRODUCTOS ---
 async function cargarProductos() {
     try {
         const res = await fetch('/api/productos');
@@ -122,7 +122,7 @@ function renderizarProductos(lista) {
     });
 }
 
-
+// --- CARRITO Y PAGO ---
 function agregarCarrito(id) {
     const p = productos.find(x=>x.id==id);
     const item = carrito.find(x=>x.id==id);
@@ -190,13 +190,13 @@ function procesarPago() {
 
 function imprimirTicket(id, total, metodo) {
     const win = window.open('','','width=350,height=500');
-    let t = `🧾 La Bodeguita De Liz\nPedido: #${id}\nCliente: ${usuarioActual.nombre}\nMétodo: ${metodo.toUpperCase()}\n----------------\n`;
+    let t = `🧾 NOVAMARKET\nPedido: #${id}\nCliente: ${usuarioActual.nombre}\nMétodo: ${metodo.toUpperCase()}\n----------------\n`;
     carrito.forEach(i=>t+=`${i.cantidad}x ${i.nombre.substr(0,15)}.. $${(i.precio*i.cantidad).toFixed(2)}\n`);
     t+=`----------------\nTOTAL: $${total}\n¡Gracias!`;
     win.document.write(`<pre>${t}</pre>`); win.print();
 }
 
-
+// --- GESTIÓN GERENTE ---
 function verTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(d=>d.style.display='none');
     document.querySelectorAll('.tab-link').forEach(b=>b.classList.remove('active'));
@@ -266,7 +266,13 @@ async function verHistorial(email) {
     document.getElementById('modal-historial').style.display='flex';
 }
 
-async function bajaCliente(id) { if(confirm("¿Eliminar?")) { await fetch(`/api/admin/clientes/${id}`, {method:'DELETE'}); cargarClientesAdmin(); } }
+async function bajaCliente(id) { 
+    if(confirm("¿Eliminar?")) { 
+        await fetch(`/api/admin/clientes/${id}`, {method:'DELETE'}); 
+        cargarClientesAdmin(); 
+    } 
+}
+
 function abrirDashboard() { actualizarStatsAdmin(); verTab('resumen'); document.getElementById('modal-dashboard').style.display='flex'; }
 
 // Helpers
@@ -278,7 +284,7 @@ function generarCategorias() { const cont = document.getElementById('filtros-cat
 function filtrar(cat, btn) { document.querySelectorAll('.cat-filters button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderizarProductos(cat==='Todas'?productos:productos.filter(p=>(p.categoria||'Otros')===cat)); }
 function filtrarProductos() { const txt = document.getElementById('buscador').value.toLowerCase(); renderizarProductos(productos.filter(p=>p.nombre.toLowerCase().includes(txt))); }
 
-// CRUD Prod
+// CRUD Productos
 let editId = null;
 
 function abrirModalProducto() {
@@ -288,7 +294,7 @@ function abrirModalProducto() {
         document.getElementById('titulo-modal-prod').innerText = 'Nuevo Producto';
     }
 
-    
+    // LIMPIAR LOS CAMPOS (Corrección agregada)
     document.getElementById('prod-nombre').value = '';
     document.getElementById('prod-precio').value = '';
     document.getElementById('prod-stock').value = '';
@@ -329,8 +335,16 @@ async function guardarProducto() {
 }
 
 async function borrarProducto(id) {
-    if (confirm('¿Borrar?')) {
-        await fetch(`/api/admin/productos/${id}`, { method: 'DELETE' });
-        cargarProductos();
+    if (confirm('¿Borrar? Se eliminará del historial de ventas también.')) {
+        const res = await fetch(`/api/admin/productos/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (data.success) {
+            alert("Producto eliminado.");
+            cargarProductos();
+            if(usuarioActual && usuarioActual.rol === 'admin') actualizarStatsAdmin();
+        } else {
+            alert("Error: " + data.error);
+        }
     }
 }

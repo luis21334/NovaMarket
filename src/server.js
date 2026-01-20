@@ -1,3 +1,4 @@
+
 const express = require('express');
 const pool = require('./db');
 const path = require('path');
@@ -7,15 +8,12 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
 
-
-
 app.get('/api/productos', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM productos ORDER BY id ASC');
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
@@ -30,7 +28,6 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
 app.post('/api/registro', async (req, res) => {
     const { nombre, email, password } = req.body;
     try {
@@ -41,7 +38,6 @@ app.post('/api/registro', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
 app.post('/api/comprar', async (req, res) => {
     const { carrito, cliente, email, metodoPago } = req.body;
     const client = await pool.connect();
@@ -49,10 +45,8 @@ app.post('/api/comprar', async (req, res) => {
         await client.query('BEGIN');
         let total = 0;
         for (const item of carrito) total += item.precio * item.cantidad;
-
         
         const clienteID = email ? `${cliente} (${email})` : `${cliente} (Anónimo)`;
-
         const pedidoRes = await client.query(
             'INSERT INTO pedidos (total, cliente_nombre) VALUES ($1, $2) RETURNING id',
             [total, `${clienteID} - ${metodoPago}`]
@@ -78,27 +72,15 @@ app.post('/api/comprar', async (req, res) => {
 
 app.get('/api/admin/stats', async (req, res) => {
     try {
-        
         const ultimoCorte = await pool.query('SELECT fecha FROM cortes_caja ORDER BY id DESC LIMIT 1');
         const fechaInicio = ultimoCorte.rows.length > 0 ? ultimoCorte.rows[0].fecha : '1970-01-01';
-
-        
-        const ventasTurno = await pool.query(
-            'SELECT SUM(total) as total, COUNT(*) as cantidad FROM pedidos WHERE fecha > $1',
-            [fechaInicio]
-        );
-
-        
+        const ventasTurno = await pool.query('SELECT SUM(total) as total, COUNT(*) as cantidad FROM pedidos WHERE fecha > $1', [fechaInicio]);
         const ingresosTotales = await pool.query('SELECT SUM(total) as total FROM pedidos');
         const stockBajo = await pool.query('SELECT COUNT(*) as cant FROM productos WHERE stock < 5');
-        const topProd = await pool.query(`
-            SELECT p.nombre, SUM(dp.cantidad) as vendidos 
-            FROM detalles_pedido dp JOIN productos p ON dp.producto_id = p.id
-            GROUP BY p.nombre ORDER BY vendidos DESC LIMIT 5
-        `);
+        const topProd = await pool.query(`SELECT p.nombre, SUM(dp.cantidad) as vendidos FROM detalles_pedido dp JOIN productos p ON dp.producto_id = p.id GROUP BY p.nombre ORDER BY vendidos DESC LIMIT 5`);
 
         res.json({
-            corteActual: ventasTurno.rows[0].total || 0, 
+            corteActual: ventasTurno.rows[0].total || 0,
             ventasTurno: ventasTurno.rows[0].cantidad || 0,
             ingresosTotales: ingresosTotales.rows[0].total || 0,
             stockBajo: stockBajo.rows[0].cant || 0,
@@ -106,7 +88,6 @@ app.get('/api/admin/stats', async (req, res) => {
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 
 app.post('/api/admin/corte', async (req, res) => {
     const { usuario, total } = req.body;
@@ -116,14 +97,12 @@ app.post('/api/admin/corte', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
 app.get('/api/admin/historial-cortes', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM cortes_caja ORDER BY fecha DESC LIMIT 10');
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 
 app.get('/api/admin/clientes', async (req, res) => {
     try {
@@ -139,6 +118,7 @@ app.get('/api/admin/historial/:email', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+
 app.delete('/api/admin/clientes/:id', async (req, res) => {
     try { await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -148,13 +128,30 @@ app.post('/api/admin/productos', async (req, res) => {
     const { nombre, precio, stock, imagen_url, categoria } = req.body;
     try { await pool.query('INSERT INTO productos (nombre, precio, stock, imagen_url, categoria) VALUES ($1, $2, $3, $4, $5)', [nombre, precio, stock, imagen_url, categoria]); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.put('/api/admin/productos/:id', async (req, res) => {
     const { nombre, precio, stock, imagen_url, categoria } = req.body;
     try { await pool.query('UPDATE productos SET nombre=$1, precio=$2, stock=$3, imagen_url=$4, categoria=$5 WHERE id=$6', [nombre, precio, stock, imagen_url, categoria, req.params.id]); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+
 app.delete('/api/admin/productos/:id', async (req, res) => {
-    try { await pool.query('DELETE FROM productos WHERE id = $1', [req.params.id]); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); }
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        await client.query('DELETE FROM detalles_pedido WHERE producto_id = $1', [req.params.id]);
+        
+        await client.query('DELETE FROM productos WHERE id = $1', [req.params.id]);
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor de get corriendo en puerto ${PORT}`));
